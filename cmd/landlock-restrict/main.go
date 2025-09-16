@@ -11,7 +11,7 @@ import (
 )
 
 func parseFlags(args []string) (verbose bool, cfg landlock.Config, opts []landlock.Rule, cmd []string) {
-	cfg = landlock.V5
+	cfg = landlock.V6
 
 	takeArgs := func(makeOpt func(...string) landlock.FSRule) landlock.Rule {
 		var paths []string
@@ -48,6 +48,10 @@ func parseFlags(args []string) (verbose bool, cfg landlock.Config, opts []landlo
 ArgParsing:
 	for len(args) > 0 {
 		switch args[0] {
+		case "-6":
+			cfg = landlock.V6
+			args = args[1:]
+			continue
 		case "-5":
 			cfg = landlock.V5
 			args = args[1:]
@@ -122,20 +126,20 @@ func main() {
 		fmt.Println("Usage:")
 		fmt.Println("  landlock-restrict")
 		fmt.Println("     [-v]")
-		fmt.Println("     [-1] [-2] [-3] [-4] [-5] [-strict]")
+		fmt.Println("     [-1] [-2] [-3] [-4] [-5] [-6] [-strict]")
 		fmt.Println("     [-ro [+refer] PATH...] [-rw [+refer] [+ioctl_dev] PATH...]")
 		fmt.Println("     [-rofiles [+refer] PATH] [-rwfiles [+refer] PATH]")
 		fmt.Println("       -- COMMAND...")
 		fmt.Println()
 		fmt.Println("Options:")
 		fmt.Println("  -ro, -rw, -rofiles, -rwfiles   paths to restrict to")
-		fmt.Println("  -1, -2, -3, -4, -5             select Landlock version")
+		fmt.Println("  -1, -2, -3, -4, -5, -6         select Landlock version")
 		fmt.Println("  -strict                        use strict mode (instead of best effort)")
 		fmt.Println("  -v                             verbose logging")
 		fmt.Println()
 		fmt.Println("A path list that contains the word '+refer' will additionally grant the refer access right.")
 		fmt.Println()
-		fmt.Println("Default mode for Landlock is V5 in best effort mode (best compatibility)")
+		fmt.Println("Default mode for Landlock is V6 in best effort mode (best compatibility)")
 		fmt.Println()
 
 		log.Fatalf("Need proper command, got %v", cmdArgs)

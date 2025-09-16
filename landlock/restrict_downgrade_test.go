@@ -109,6 +109,19 @@ func TestDowngradeNetwork(t *testing.T) {
 	}
 }
 
+func TestDowngradeScopes(t *testing.T) {
+	cfg := Config{handledScopes: ScopeSignal}
+	abi := abiInfos[5] // ABI without scope support
+	gotCfg, rules := downgrade(cfg, nil, abi)
+
+	if gotCfg.handledScopes != 0 {
+		t.Errorf("downgrade to v5 should remove scope support, but resulted in %v", gotCfg)
+	}
+	if len(rules) != 0 {
+		t.Errorf("expected no rules, got %d", len(rules))
+	}
+}
+
 func TestDowngradeNoop(t *testing.T) {
 	for _, abi := range abiInfos {
 		t.Run(fmt.Sprintf("V%v", abi.version), func(t *testing.T) {

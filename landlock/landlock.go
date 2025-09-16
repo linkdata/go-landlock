@@ -5,12 +5,12 @@
 // The following invocation will restrict all goroutines so that they
 // can only read from /usr, /bin and /tmp, and only write to /tmp:
 //
-//	err := landlock.V5.BestEffort().RestrictPaths(
+//	err := landlock.V6.BestEffort().RestrictPaths(
 //	    landlock.RODirs("/usr", "/bin"),
 //	    landlock.RWDirs("/tmp"),
 //	)
 //
-// This will restrict file access using Landlock V5, if available. If
+// This will restrict file access using Landlock V6, if available. If
 // unavailable, it will attempt using earlier Landlock versions than
 // the one requested. If no Landlock version is available, it will
 // still succeed, without restricting file accesses.
@@ -20,12 +20,12 @@
 // The following invocation will restrict all goroutines so that they
 // can only bind to TCP port 8080 and only connect to TCP port 53:
 //
-//	err := landlock.V5.BestEffort().RestrictNet(
+//	err := landlock.V6.BestEffort().RestrictNet(
 //	    landlock.BindTCP(8080),
 //	    landlock.ConnectTCP(53),
 //	)
 //
-// This functionality is available since Landlock V5.
+// This functionality is available since Landlock V4.
 //
 // # Restricting file access and networking at once
 //
@@ -33,18 +33,26 @@
 // once.  The effect is the same as calling [Config.RestrictPaths] and
 // [Config.RestrictNet] one after another, but it happens in one step.
 //
-//	err := landlock.V5.BestEffort().Restrict(
+//	err := landlock.V6.BestEffort().Restrict(
 //	    landlock.RODirs("/usr", "/bin"),
 //	    landlock.RWDirs("/tmp"),
 //	    landlock.BindTCP(8080),
 //	    landlock.ConnectTCP(53),
 //	)
 //
+// # Restricting IPC interactions
+//
+// Landlock V6 can also restrict some IPC interactions that cross Landlock domains, such as sending signals to processes outside of the sandbox or connecting to abstract UNIX sockets created by non-sandboxed processes.
+//
+//	err := landlock.MustConfig(landlock.ScopeAbstractUnixSocket | landlock.ScopeSignal).Restrict()
+//
+// This functionality is available since Landlock V6.
+//
 // # More possible invocations
 //
-// landlock.V5.RestrictPaths(...) (without the call to
+// landlock.V6.RestrictPaths(...) (without the call to
 // [Config.BestEffort]) enforces the given rules using the
-// capabilities of Landlock V5, but returns an error if that
+// capabilities of Landlock V6, but returns an error if that
 // functionality is not available on the system that the program is
 // running on.
 //
