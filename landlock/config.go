@@ -39,6 +39,8 @@ var (
 	V4 = abiInfos[4].asConfig()
 	// Landlock V5 support (V4 + ioctl on device files)
 	V5 = abiInfos[5].asConfig()
+	// Landlock V6 support (V5 + scope restrictions)
+	V6 = abiInfos[6].asConfig()
 )
 
 // v0 denotes "no Landlock support". Only used internally.
@@ -50,6 +52,7 @@ var v0 = Config{}
 type Config struct {
 	handledAccessFS  AccessFSSet
 	handledAccessNet AccessNetSet
+	handledScopes    ScopeSet
 	bestEffort       bool
 }
 
@@ -86,8 +89,16 @@ func NewConfig(args ...interface{}) (*Config, error) {
 				return nil, errors.New("unsupported AccessNetSet value; upgrade go-landlock?")
 			}
 			c.handledAccessNet = arg
+		case ScopeSet:
+			if !c.handledScopes.isEmpty() {
+				return nil, errors.New("only one ScopeSet may be provided")
+			}
+			if !arg.valid() {
+				return nil, errors.New("unsupported ScopeSet value; upgrade go-landlock?")
+			}
+			c.handledScopes = arg
 		default:
-			return nil, fmt.Errorf("unknown argument %v; only AccessFSSet-type argument is supported", arg)
+			return nil, fmt.Errorf("unknown argument %v; only AccessFSSet, AccessNetSet, and ScopeSet arguments are supported", arg)
 		}
 	}
 	return &c, nil
@@ -112,29 +123,32 @@ func (c Config) String() string {
 		}
 	}
 
-	var fsDesc = c.handledAccessFS.String()
-	if abi.supportedAccessFS == c.handledAccessFS && c.handledAccessFS != 0 {
+	fsDesc := c.handledAccessFS.String()
+	if !c.handledAccessFS.isEmpty() && abi.supportedAccessFS == c.handledAccessFS {
 		fsDesc = "all"
 	}
 
-	var netDesc = c.handledAccessNet.String()
-	if abi.supportedAccessNet == c.handledAccessNet && c.handledAccessNet != 0 {
-		fsDesc = "all"
+	netDesc := c.handledAccessNet.String()
+	if !c.handledAccessNet.isEmpty() && abi.supportedAccessNet == c.handledAccessNet {
+		netDesc = "all"
 	}
 
-	var bestEffort = ""
+	scopeDesc := c.handledScopes.String()
+	if !c.handledScopes.isEmpty() && abi.supportedScopes == c.handledScopes {
+		scopeDesc = "all"
+	}
+
+	bestEffort := ""
 	if c.bestEffort {
 		bestEffort = " (best effort)"
 	}
 
-	var version string
-	if abi.version < 0 {
-		version = "V???"
-	} else {
+	version := "V???"
+	if abi.version >= 0 {
 		version = fmt.Sprintf("V%v", abi.version)
 	}
 
-	return fmt.Sprintf("{Landlock %v; FS: %v; Net: %v%v}", version, fsDesc, netDesc, bestEffort)
+	return fmt.Sprintf("{Landlock %v; FS: %v; Net: %v; Scope: %v%v}", version, fsDesc, netDesc, scopeDesc, bestEffort)
 }
 
 // BestEffort returns a config that will opportunistically enforce
@@ -209,6 +223,16 @@ func (c Config) BestEffort() Config {
 //   - Creating (or renaming or linking) a symbolic link (V1+)
 //   - Renaming or linking a file between directories (V2+)
 //
+// For networking:
+//
+//   - Binding a TCP socket to a local port (V4+)
+//   - Connecting a TCP socket to a remote port (V4+)
+//
+// For IPC scopes:
+//
+//   - Connecting to an abstract UNIX socket created outside the Landlock domain (V6+)
+//   - Sending signals to processes outside the Landlock domain (V6+)
+//
 // Future versions of Landlock will be able to inhibit more operations.
 // Quoting the Landlock documentation:
 //
@@ -242,6 +266,7 @@ func (c Config) BestEffort() Config {
 // [Kernel Documentation about Access Rights]: https://www.kernel.org/doc/html/latest/userspace-api/landlock.html#access-rights
 func (c Config) RestrictPaths(rules ...Rule) error {
 	c.handledAccessNet = 0 // clear out everything but file system access
+	c.handledScopes = 0
 	return restrict(c, rules...)
 }
 
@@ -260,18 +285,15 @@ func (c Config) RestrictPaths(rules ...Rule) error {
 // [Kernel Documentation about Network flags]: https://www.kernel.org/doc/html/latest/userspace-api/landlock.html#network-flags
 func (c Config) RestrictNet(rules ...Rule) error {
 	c.handledAccessFS = 0 // clear out everything but network access
+	c.handledScopes = 0
 	return restrict(c, rules...)
 }
 
 // Restrict restricts all types of access which is restrictable with the Config.
 //
-// Using Landlock V4, this is equivalent to calling both
-// [RestrictPaths] and [RestrictNet] with the subset of arguments that
-// apply to it.
-//
-// In future Landlock versions, this function might restrict
-// additional kinds of operations outside of file system access and
-// networking, provided that the [Config] specifies these.
+// Using Landlock V6, this can apply file system rules, network rules,
+// and scope restrictions (abstract UNIX sockets and signals) in one
+// step when the [Config] enables them.
 func (c Config) Restrict(rules ...Rule) error {
 	return restrict(c, rules...)
 }
@@ -285,7 +307,8 @@ type PathOpt = Rule
 // compatibleWith is true if c is compatible to work at the given Landlock ABI level.
 func (c Config) compatibleWithABI(abi abiInfo) bool {
 	return (c.handledAccessFS.isSubset(abi.supportedAccessFS) &&
-		c.handledAccessNet.isSubset(abi.supportedAccessNet))
+		c.handledAccessNet.isSubset(abi.supportedAccessNet) &&
+		c.handledScopes.isSubset(abi.supportedScopes))
 }
 
 // restrictTo returns a config that is a subset of c and which is compatible with the given ABI.
@@ -293,6 +316,7 @@ func (c Config) restrictTo(abi abiInfo) Config {
 	return Config{
 		handledAccessFS:  c.handledAccessFS.intersect(abi.supportedAccessFS),
 		handledAccessNet: c.handledAccessNet.intersect(abi.supportedAccessNet),
+		handledScopes:    c.handledScopes.intersect(abi.supportedScopes),
 		bestEffort:       true,
 	}
 }

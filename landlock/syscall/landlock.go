@@ -14,6 +14,8 @@
 // https://www.kernel.org/doc/html/latest/userspace-api/landlock.html.
 package syscall
 
+import "unsafe"
+
 // Landlock file system access rights.
 //
 // Please see the full documentation at
@@ -46,6 +48,15 @@ const (
 	AccessNetConnectTCP
 )
 
+// Landlock scope flags.
+//
+// Please see the full documentation at
+// https://www.kernel.org/doc/html/latest/userspace-api/landlock.html#scope-flags.
+const (
+	ScopeAbstractUnixSocket = 1 << iota
+	ScopeSignal
+)
+
 // RulesetAttr is the Landlock ruleset definition.
 //
 // Argument of LandlockCreateRuleset(). This structure can grow in future versions of Landlock.
@@ -54,10 +65,11 @@ const (
 type RulesetAttr struct {
 	HandledAccessFS  uint64
 	HandledAccessNet uint64
+	Scoped           uint64
 }
 
 // The size of the RulesetAttr struct in bytes.
-const rulesetAttrSize = 16
+const rulesetAttrSize = unsafe.Sizeof(RulesetAttr{})
 
 // PathBeneathAttr references a file hierarchy and defines the desired
 // extent to which it should be usable when the rule is enforced.

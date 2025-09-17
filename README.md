@@ -11,7 +11,7 @@ use files, using Linux 5.13's Landlock feature.
 In a Go program, after starting up and doing program initialization work, run:
 
 ```
-err := landlock.V5.BestEffort().RestrictPaths(
+err := landlock.V6.BestEffort().RestrictPaths(
     landlock.RODirs("/usr", "/bin"),
     landlock.RWDirs("/tmp"),
 )
@@ -23,7 +23,7 @@ Landlock is a Linux kernel feature and can restrict the following types of acces
 
 * Filesystem access
 * Some network operations
-* Some IPC operations (not implemented yet in Go: [#35](https://github.com/landlock-lsm/go-landlock/issues/35))
+* Some IPC operations (abstract UNIX sockets and signaling)
 
 More details and examples in the [Go-Landlock
 documentation](https://pkg.go.dev/github.com/landlock-lsm/go-landlock/landlock).
